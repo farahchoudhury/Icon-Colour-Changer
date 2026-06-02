@@ -12,6 +12,7 @@ Colorblind modes recolor icon regions using K-Means clustering + palette mapping
 
 import os
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog, messagebox
 
 import numpy as np
@@ -265,17 +266,98 @@ def select_output_folder(output_folder_label):
 def main():
     """Launches the Tkinter GUI application."""
     root = tk.Tk()
-    root.title("Colorblind-Friendly Icon Processor (K-Means Version)")
-    root.geometry("600x500")
+    root.title("Colorblind-Friendly Icon Processor")
+    root.geometry("750x550")
+    root.minsize(700, 600)
+
+    # Modern ttk theme
+    style = ttk.Style()
+    style.theme_use("clam")
+
+    style.configure(
+        "Title.TLabel",
+        font=("Segoe UI", 18, "bold")
+    )
+
+    style.configure(
+        "Accent.TButton",
+        font=("Segoe UI", 10, "bold"),
+        padding=8
+    )
 
     selected_output_folder = None
+    status_var = tk.StringVar(value="Ready")
 
-    # Selected file list UI
-    selected_files_listbox = tk.Listbox(root, height=10, width=80)
-    selected_files_listbox.pack(pady=10)
+    # ------------------------
+    # Main Container
+    # ------------------------
+    main_frame = ttk.Frame(root, padding=20)
+    main_frame.pack(fill="both", expand=True)
 
-    output_folder_label = tk.Label(root, text="No output folder selected")
-    output_folder_label.pack(pady=10)
+    # Title
+    ttk.Label(
+        main_frame,
+        text="Colorblind-Friendly Icon Processor",
+        style="Title.TLabel"
+    ).pack(pady=(0, 20))
+
+    ttk.Label(
+        main_frame,
+        text="Generate Light, Dark, and Colorblind-Friendly icon variants."
+    ).pack(pady=(0, 15))
+
+    # ------------------------
+    # File Selection
+    # ------------------------
+    files_frame = ttk.LabelFrame(
+        main_frame,
+        text="Selected Files",
+        padding=10
+    )
+    files_frame.pack(fill="both", expand=True)
+
+    # Container for listbox + scrollbar
+    listbox_frame = ttk.Frame(files_frame)
+    listbox_frame.pack(fill="both", expand=True)
+
+    selected_files_listbox = tk.Listbox(
+        listbox_frame,
+        font=("Consolas", 10),
+        height=12
+    )
+
+    scrollbar = ttk.Scrollbar(
+        listbox_frame,
+        orient="vertical",
+        command=selected_files_listbox.yview
+    )
+
+    selected_files_listbox.configure(
+        yscrollcommand=scrollbar.set
+    )
+
+    selected_files_listbox.pack(
+        side="left",
+        fill="both",
+        expand=True,
+        padx=(5, 0),
+        pady=5
+    )
+
+    scrollbar.pack(
+        side="right",
+        fill="y",
+        pady=5
+    )
+
+    # ------------------------
+    # Output Folder
+    # ------------------------
+    output_folder_label = ttk.Label(
+        main_frame,
+        text="No output folder selected"
+    )
+    output_folder_label.pack(pady=15)
 
     def browse_output_folder():
         nonlocal selected_output_folder
@@ -286,23 +368,69 @@ def main():
         if not selected_files_listbox.size() or selected_output_folder is None:
             messagebox.showwarning(
                 "Missing Information",
-                "Please select both files and output folder.",
+                "Please select files and an output folder."
             )
             return
 
         files = selected_files_listbox.get(0, tk.END)
-        process_files(files, selected_output_folder)
-        messagebox.showinfo("Processing Complete", "Files processed successfully.")
 
-    # UI Controls
-    tk.Button(root, text="Select Files",
-              command=lambda: browse_files(selected_files_listbox)).pack(pady=10)
+        try:
+            status_var.set("Processing...")
+            root.update_idletasks()
 
-    tk.Button(root, text="Select Output Folder",
-              command=browse_output_folder).pack(pady=10)
+            process_files(files, selected_output_folder)
 
-    tk.Button(root, text="Process Files",
-              command=process).pack(pady=20)
+            status_var.set("Finished successfully")
+
+            messagebox.showinfo(
+                "Success",
+                "All icons processed successfully."
+            )
+
+        except Exception as e:
+            status_var.set("Error")
+            messagebox.showerror(
+                "Error",
+                str(e)
+            )
+
+    # ------------------------
+    # Buttons
+    # ------------------------
+    button_frame = ttk.Frame(main_frame)
+    button_frame.pack(pady=20)
+
+    ttk.Button(
+        button_frame,
+        text="📂 Select Files",
+        command=lambda: browse_files(selected_files_listbox)
+    ).grid(row=0, column=0, padx=5)
+
+    ttk.Button(
+        button_frame,
+        text="📁 Output Folder",
+        command=browse_output_folder
+    ).grid(row=0, column=1, padx=5)
+
+    ttk.Button(
+        button_frame,
+        text="Process",
+        style="Accent.TButton",
+        command=process
+    ).grid(row=0, column=2, padx=5)
+
+    # Status bar
+    status_label = ttk.Label(
+        root,
+        textvariable=status_var,
+        relief="sunken",
+        anchor="w"
+    )
+
+    status_label.pack(
+        side="bottom",
+        fill="x"
+    )
 
     root.mainloop()
 
