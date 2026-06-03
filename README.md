@@ -1,4 +1,4 @@
-# Icon Colour Changer
+# Colorblind-Friendly Icon Processor
 
 A Python desktop application for generating accessibility-friendly icon variants.
 
@@ -6,17 +6,18 @@ The application processes PNG icons and automatically creates light, dark, and c
 
 ## Features
 
-- Generate light and dark theme icon variants
-- Create colourblind-friendly versions for:
+- Generate light theme icon exports (original icon)
+- Generate dark theme icon exports using a white outline for visibility
+- Generate colourblind-friendly icon variants for:
   - Deuteranopia
   - Protanopia
   - Tritanopia
-- Dark mode uses a white outline for improved visibility instead of colour inversion
 - K-Means colour clustering for intelligent colour remapping
 - Batch process multiple PNG files at once
-- Simple desktop GUI built with Tkinter
-- Scrollable file list for larger batches
-- Status bar with processing and completion feedback
+- Select which output variants to generate
+- View selected files before processing
+- Progress bar and status updates during processing
+- Built with Tkinter for a lightweight desktop interface
 - Can be packaged as a standalone executable using PyInstaller
 
 ## How It Works
@@ -27,17 +28,17 @@ Exports the original icon without modification.
 
 ### Dark Theme
 
-Adds a clean white outline around the icon to improve visibility on dark backgrounds.
+Adds a white outline around the icon while preserving the original colours. This improves visibility when icons are displayed on dark backgrounds.
 
 ### Colourblind-Friendly Themes
 
-The application uses K-Means clustering to identify dominant colours in an icon and remaps them to accessibility-focused palettes designed for:
+The application uses K-Means clustering to identify dominant colours within an icon. Detected colours are classified and remapped to accessibility-focused palettes designed for:
 
 - Deuteranopia
 - Protanopia
 - Tritanopia
 
-This helps improve colour distinction while preserving the overall appearance of the original icon.
+This approach preserves the overall appearance of the icon while improving colour distinction for users with colour vision deficiencies.
 
 ## Supported File Types
 
@@ -47,7 +48,7 @@ This helps improve colour distinction while preserving the overall appearance of
 
 ### Output
 
-The application generates separate output folders for:
+Selected variants are generated into separate folders:
 
 ```text
 light/
@@ -91,11 +92,13 @@ dist/
 ## Usage
 
 1. Launch the application.
-2. Select one or more PNG icons.
-3. Choose an output directory.
-4. Click **Process**.
-5. Generated icon variants will be written into theme-specific folders.
+2. Click **Add Files** and select one or more PNG icons
+3. (Optional) Click **View Files** to review selected inputs
+4. Choose an output directory.
+5. Select which variants you want to generate.
+6. Click **Process Icons**.
+7. Output folders will be created per selected variant.
 
 ## Contributing
 
-Feel free to fork the project, experiment, and submit improvements.
+Feel free to fork the project, experiment, and submit improvements!
