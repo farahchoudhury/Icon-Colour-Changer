@@ -19,7 +19,6 @@ import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 from sklearn.cluster import KMeans
 
-
 # -----------------------------------------------------------
 # Color Replacement Palettes for Colorblind Accessibility
 # -----------------------------------------------------------
@@ -43,12 +42,6 @@ COLORBLIND_PALETTES = {
         "blue": (255, 180, 0),
         "yellow": (255, 200, 100),
     },
-}
-
-# Theme outline colors for regular icon exports
-ICON_COLORS = {
-    "light": "#000000",
-    "dark": "#FFFFFF",
 }
 
 
@@ -177,14 +170,13 @@ def add_white_outline(img, thickness=3, outline_color=(255, 255, 255)):
 # File Processing Logic
 # -----------------------------------------------------------
 
-def apply_color_scheme(input_path, output_path, theme, palette, outline_color=None):
+def apply_color_scheme(input_path, output_path, palette):
     """
     Apply a colorblind-mode palette to an image file and save the result.
 
     Args:
         input_path: path to source icon
         output_path: directory for output
-        theme: colorblind mode name
         palette: palette dict mapping color categories to RGB values
     """
     img = Image.open(input_path)
@@ -195,68 +187,92 @@ def apply_color_scheme(input_path, output_path, theme, palette, outline_color=No
     img_transformed.save(output_file)
 
 
-def process_files(files, output_dir):
+def process_files(files, output_dir, export_options, progress_callback=None):
     """
-    Processes the selected list of icon files:
-        - Exports light and dark theme variants
-        - Generates colorblind-friendly versions
+    Processes the selected icon files and generates the requested exports.
 
     Args:
-        files: List of input file paths
+        files: List of source PNG file paths
         output_dir: Root output directory
+        export_options: Dict indicating which variants to generate
+        progress_callback: Optional callback receiving (current_file, total_files) progress updates
     """
-    for input_file in files:
+    total = len(files)
+
+    for index, input_file in enumerate(files):
 
         # -------------------------
         # Light/Dark Theme Processing
         # -------------------------
-        for theme, outline_color in ICON_COLORS.items():
-            output_path = os.path.join(output_dir, theme)
+        if export_options.get("light"):
+            output_path = os.path.join(output_dir, "light")
+            os.makedirs(output_path, exist_ok=True)
+
+            img = Image.open(input_file).convert("RGBA")
+            img.save(os.path.join(output_path, os.path.basename(input_file)))
+
+        if export_options.get("dark"):
+            output_path = os.path.join(output_dir, "dark")
             os.makedirs(output_path, exist_ok=True)
 
             img = Image.open(input_file).convert("RGBA")
 
-            if theme == "dark":
-                # Dark mode: apply white outline
-                outlined = add_white_outline(
-                    img, thickness=3, outline_color=(255, 255, 255)
-                )
-                outlined.save(os.path.join(output_path, os.path.basename(input_file)))
-            else:
-                # Light mode: preserve original image
-                img.save(os.path.join(output_path, os.path.basename(input_file)))
+            outlined = add_white_outline(
+                img,
+                thickness=3,
+                outline_color=(255, 255, 255)
+            )
+
+            outlined.save(os.path.join(output_path, os.path.basename(input_file)))
 
         # -------------------------
         # Colorblind-Friendly Versions
         # -------------------------
-        for theme, palette in COLORBLIND_PALETTES.items():
-            output_path = os.path.join(output_dir, theme)
-            apply_color_scheme(input_file, output_path, theme, palette)
+        for mode, palette in COLORBLIND_PALETTES.items():
+
+            if not export_options.get(mode, False):
+                continue
+
+            output_path = os.path.join(output_dir, mode)
+
+            apply_color_scheme(
+                input_file,
+                output_path,
+                palette
+            )
+
+        # Update UI progress after processing each file
+        if progress_callback:
+            progress_callback(index + 1, total)
 
 
-# -----------------------------------------------------------
-# UI (Tkinter Interface)
-# -----------------------------------------------------------
+def shorten_path(path, max_length=55):
+    """Shortens long filesystem paths for display labels."""
+    if len(path) <= max_length:
+        return path
 
-def browse_files(selected_files_listbox):
-    """Opens a file dialog and adds selected image paths to the UI listbox."""
-    files = filedialog.askopenfilenames(
-        title="Select Icons",
-        filetypes=[("PNG Files", "*.png"), ("All Files", "*.*")]
+    return "..." + path[-(max_length - 3):]
+
+
+def show_selected_files(parent, files):
+    """Display a window containing the selected file paths."""
+    window = tk.Toplevel(parent)
+    window.title("Selected Files")
+    window.geometry("700x400")
+
+    # Create a popup window for viewing selected files
+    frame = ttk.Frame(window, padding=10)
+    frame.pack(fill="both", expand=True)
+
+    listbox = tk.Listbox(
+        frame,
+        font=("Consolas", 10)
     )
+    listbox.pack(fill="both", expand=True)
 
-    if files:
-        selected_files_listbox.delete(0, tk.END)
-        for file in files:
-            selected_files_listbox.insert(tk.END, file)
-
-
-def select_output_folder(output_folder_label):
-    """Prompts user for an output folder and updates UI label."""
-    output_dir = filedialog.askdirectory(title="Select Output Folder")
-    if output_dir:
-        output_folder_label.config(text=f"Output folder: {output_dir}")
-    return output_dir
+    # Populate list with all selected file paths
+    for file in files:
+        listbox.insert(tk.END, file)
 
 
 # -----------------------------------------------------------
@@ -267,167 +283,315 @@ def main():
     """Launches the Tkinter GUI application."""
     root = tk.Tk()
     root.title("Colorblind-Friendly Icon Processor")
-    root.geometry("750x550")
-    root.minsize(700, 600)
+    root.geometry("760x640")
+    root.minsize(700, 640)
 
-    # Modern ttk theme
     style = ttk.Style()
     style.theme_use("clam")
 
     style.configure(
         "Title.TLabel",
-        font=("Segoe UI", 18, "bold")
+        font=("Segoe UI", 20, "bold")
     )
 
     style.configure(
-        "Accent.TButton",
-        font=("Segoe UI", 10, "bold"),
-        padding=8
+        "Subtitle.TLabel",
+        foreground="#666666",
+        font=("Segoe UI", 9)
     )
 
-    selected_output_folder = None
-    status_var = tk.StringVar(value="Ready")
-
-    # ------------------------
-    # Main Container
-    # ------------------------
-    main_frame = ttk.Frame(root, padding=20)
-    main_frame.pack(fill="both", expand=True)
-
-    # Title
-    ttk.Label(
-        main_frame,
-        text="Colorblind-Friendly Icon Processor",
-        style="Title.TLabel"
-    ).pack(pady=(0, 20))
-
-    ttk.Label(
-        main_frame,
-        text="Generate Light, Dark, and Colorblind-Friendly icon variants."
-    ).pack(pady=(0, 15))
-
-    # ------------------------
-    # File Selection
-    # ------------------------
-    files_frame = ttk.LabelFrame(
-        main_frame,
-        text="Selected Files",
+    style.configure(
+        "Process.TButton",
+        font=("Segoe UI", 10, "bold"),
         padding=10
     )
-    files_frame.pack(fill="both", expand=True)
 
-    # Container for listbox + scrollbar
-    listbox_frame = ttk.Frame(files_frame)
-    listbox_frame.pack(fill="both", expand=True)
+    selected_files = []
+    selected_output_folder = None
 
-    selected_files_listbox = tk.Listbox(
-        listbox_frame,
-        font=("Consolas", 10),
-        height=12
+    status_var = tk.StringVar(value="Ready")
+    file_count_var = tk.StringVar(value="No files selected")
+    output_var = tk.StringVar(value="No output folder selected")
+
+    main = ttk.Frame(root, padding=20)
+    main.pack(fill="both", expand=True)
+
+    # --------------------------------------------------
+    # Header
+    # --------------------------------------------------
+
+    ttk.Label(
+        main,
+        text="Colorblind-Friendly Icon Processor",
+        style="Title.TLabel"
+    ).pack(anchor="w")
+
+    ttk.Label(
+        main,
+        text="Generate light, dark and accessibility-focused icon variants.",
+        style="Subtitle.TLabel"
+    ).pack(anchor="w", pady=(0, 20))
+
+    # --------------------------------------------------
+    # Files
+    # --------------------------------------------------
+
+    files_frame = ttk.LabelFrame(
+        main,
+        text="Files",
+        padding=12
     )
+    files_frame.pack(fill="x", pady=(0, 10))
 
-    scrollbar = ttk.Scrollbar(
-        listbox_frame,
-        orient="vertical",
-        command=selected_files_listbox.yview
-    )
+    ttk.Label(
+        files_frame,
+        textvariable=file_count_var
+    ).pack(anchor="w")
 
-    selected_files_listbox.configure(
-        yscrollcommand=scrollbar.set
-    )
+    file_button_frame = ttk.Frame(files_frame)
+    file_button_frame.pack(anchor="w", pady=(8, 0))
 
-    selected_files_listbox.pack(
-        side="left",
-        fill="both",
-        expand=True,
-        padx=(5, 0),
-        pady=5
-    )
+    def browse_files():
 
-    scrollbar.pack(
-        side="right",
-        fill="y",
-        pady=5
-    )
+        nonlocal selected_files
 
-    # ------------------------
+        files = filedialog.askopenfilenames(
+            title="Select PNG Files",
+            filetypes=[
+                ("PNG Files", "*.png"),
+                ("All Files", "*.*")
+            ]
+        )
+
+        if not files:
+            return
+
+        selected_files = list(files)
+
+        file_count_var.set(
+            f"{len(selected_files)} file(s) selected"
+        )
+
+    ttk.Button(
+        file_button_frame,
+        text="Add Files",
+        command=browse_files
+    ).pack(side="left", padx=(0, 8))
+
+    ttk.Button(
+        file_button_frame,
+        text="View Files",
+        command=lambda: show_selected_files(
+            root,
+            selected_files
+        )
+    ).pack(side="left")
+
+    # --------------------------------------------------
     # Output Folder
-    # ------------------------
-    output_folder_label = ttk.Label(
-        main_frame,
-        text="No output folder selected"
+    # --------------------------------------------------
+
+    output_frame = ttk.LabelFrame(
+        main,
+        text="Output Folder",
+        padding=12
     )
-    output_folder_label.pack(pady=15)
+    output_frame.pack(fill="x", pady=(0, 10))
+
+    ttk.Label(
+        output_frame,
+        textvariable=output_var
+    ).pack(anchor="w")
 
     def browse_output_folder():
+
         nonlocal selected_output_folder
-        selected_output_folder = select_output_folder(output_folder_label)
+
+        folder = filedialog.askdirectory(
+            title="Select Output Folder"
+        )
+
+        if not folder:
+            return
+
+        selected_output_folder = folder
+
+        output_var.set(
+            shorten_path(folder)
+        )
+
+    ttk.Button(
+        output_frame,
+        text="Choose Folder",
+        command=browse_output_folder
+    ).pack(anchor="w", pady=(8, 0))
+
+    # --------------------------------------------------
+    # Variants
+    # --------------------------------------------------
+
+    options_frame = ttk.LabelFrame(
+        main,
+        text="Variants",
+        padding=12
+    )
+    options_frame.pack(fill="x", pady=(0, 15))
+
+    light_var = tk.BooleanVar(value=True)
+    dark_var = tk.BooleanVar(value=True)
+
+    deut_var = tk.BooleanVar(value=True)
+    prot_var = tk.BooleanVar(value=True)
+    trit_var = tk.BooleanVar(value=True)
+
+    ttk.Checkbutton(
+        options_frame,
+        text="Light",
+        variable=light_var
+    ).grid(row=0, column=0, sticky="w")
+
+    ttk.Checkbutton(
+        options_frame,
+        text="Dark",
+        variable=dark_var
+    ).grid(row=0, column=1, sticky="w")
+
+    ttk.Checkbutton(
+        options_frame,
+        text="Deuteranopia",
+        variable=deut_var
+    ).grid(row=1, column=0, sticky="w")
+
+    ttk.Checkbutton(
+        options_frame,
+        text="Protanopia",
+        variable=prot_var
+    ).grid(row=1, column=1, sticky="w")
+
+    ttk.Checkbutton(
+        options_frame,
+        text="Tritanopia",
+        variable=trit_var
+    ).grid(row=2, column=0, sticky="w")
+
+    # --------------------------------------------------
+    # Progress
+    # --------------------------------------------------
+
+    progress = ttk.Progressbar(
+        main,
+        mode="determinate"
+    )
+
+    progress.pack(
+        fill="x",
+        pady=(0, 15)
+    )
+
+    # --------------------------------------------------
+    # Process
+    # --------------------------------------------------
 
     def process():
-        """Runs the full processing pipeline."""
-        if not selected_files_listbox.size() or selected_output_folder is None:
+
+        if not selected_files:
             messagebox.showwarning(
-                "Missing Information",
-                "Please select files and an output folder."
+                "Missing Files",
+                "Please select at least one PNG file."
             )
             return
 
-        files = selected_files_listbox.get(0, tk.END)
+        if not selected_output_folder:
+            messagebox.showwarning(
+                "Missing Output Folder",
+                "Please select an output folder."
+            )
+            return
 
-        try:
-            status_var.set("Processing...")
+        export_options = {
+            "light": light_var.get(),
+            "dark": dark_var.get(),
+            "deuteranopia": deut_var.get(),
+            "protanopia": prot_var.get(),
+            "tritanopia": trit_var.get(),
+        }
+
+        progress["value"] = 0
+        progress["maximum"] = len(selected_files)
+
+        def update_progress(current, total):
+
+            progress["value"] = current
+
+            status_var.set(
+                f"Processing {current}/{total}"
+            )
+
             root.update_idletasks()
 
-            process_files(files, selected_output_folder)
+        try:
 
-            status_var.set("Finished successfully")
+            if not any(export_options.values()):
+                messagebox.showwarning(
+                    "No Variants Selected",
+                    "Please select at least one output variant."
+                )
+                return
+
+            process_files(
+                selected_files,
+                selected_output_folder,
+                export_options,
+                update_progress
+            )
+
+            status_var.set("Completed")
+
+            enabled = [
+                name
+                for name, enabled in export_options.items()
+                if enabled
+            ]
 
             messagebox.showinfo(
-                "Success",
-                "All icons processed successfully."
+                "Completed",
+                f"Files processed: {len(selected_files)}\n\n"
+                f"Generated:\n"
+                + "\n".join(f"- {x}" for x in enabled)
+                + f"\n\nOutput:\n{selected_output_folder}"
             )
 
         except Exception as e:
+
             status_var.set("Error")
+
             messagebox.showerror(
-                "Error",
+                "Processing Error",
                 str(e)
             )
 
-    # ------------------------
-    # Buttons
-    # ------------------------
-    button_frame = ttk.Frame(main_frame)
-    button_frame.pack(pady=20)
-
     ttk.Button(
-        button_frame,
-        text="📂 Select Files",
-        command=lambda: browse_files(selected_files_listbox)
-    ).grid(row=0, column=0, padx=5)
-
-    ttk.Button(
-        button_frame,
-        text="📁 Output Folder",
-        command=browse_output_folder
-    ).grid(row=0, column=1, padx=5)
-
-    ttk.Button(
-        button_frame,
-        text="Process",
-        style="Accent.TButton",
+        main,
+        text="Process Icons",
+        style="Process.TButton",
         command=process
-    ).grid(row=0, column=2, padx=5)
+    ).pack(
+        pady=(0, 10),
+        ipadx=30
+    )
 
-    # Status bar
-    status_label = ttk.Label(
+    # --------------------------------------------------
+    # Status
+    # --------------------------------------------------
+
+    status = ttk.Label(
         root,
         textvariable=status_var,
         relief="sunken",
         anchor="w"
     )
 
-    status_label.pack(
+    status.pack(
         side="bottom",
         fill="x"
     )
